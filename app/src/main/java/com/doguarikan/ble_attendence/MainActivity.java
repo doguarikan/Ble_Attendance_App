@@ -16,6 +16,7 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ParcelUuid;
+import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,17 +31,30 @@ import androidx.core.view.WindowInsetsCompat;
 
 import java.util.UUID;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+
 public class MainActivity extends AppCompatActivity {
 
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
     private static final String SERVICE_UUID = "532d9284-c4b6-47f4-a90c-973df1aced44";
+    private static final String baseURL = "https://dummyjson.com/c/9860-814b-4b3b-8308/";
 
     private BluetoothAdapter bl_adapter; // bluetooth ozelliklerine erişim için
     private BluetoothLeAdvertiser ble_advertiser; // ble yayını için kullanılır
     private BluetoothLeScanner ble_scanner; // ble taraması için kullanılır
     private ScanCallback scan_callback; //ble sonuclarını işlemek icin kullanılır
     private TextView device_listTextView; // ekrana basılan hash kodunun yazıldığı yer
-    private String hash_code;// kullanılan hash kodu, json bu dışarıdan gelecek ve advertise edilip, ogrenciden sisteme yollanacak
+    private String hash_code = "";// kullanılan hash kodu, json bu dışarıdan gelecek ve advertise edilip, ogrenciden sisteme yollanacak
+    private Runnable runnable;
+    private Handler handler = new Handler();
+    private Retrofit retrofit;
+    private HashApi hashApi;
+    private Call<Hash> hashCall;
+    private Hash hash_instance;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,12 +74,23 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        hash_code = "abc";
-
-        advertiseButton.setOnClickListener(v -> advertise());
-        scanButton.setOnClickListener(v -> scan());
-
+        hash_code = get_request();
         check_permissions();
+        set_retrofit_settings();
+
+        advertiseButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                advertise();
+            }
+        });
+        scanButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                scan();
+            }
+        });
+        //update_hash();
     }
 
     private void check_permissions() {
@@ -84,6 +109,36 @@ public class MainActivity extends AppCompatActivity {
                     },
                     MY_PERMISSIONS_REQUEST_LOCATION);
         }
+    }
+
+    private void set_retrofit_settings() {// ????!!!!!
+        retrofit = new Retrofit.Builder()
+                .baseUrl(baseURL)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
+
+        hashApi = retrofit.create(HashApi.class);
+        hashCall = hashApi.get_hash();
+
+        hashCall.enqueue(new Callback<Hash>() {
+            @Override
+            public void onResponse(Call<Hash> call, Response<Hash> response) {
+                if(response.isSuccessful()) {
+                    hash_instance = response.body();
+                    hash_code = hash_instance.getHash_code();
+                    device_listTextView.setText(hash_instance.getHash_code());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Hash> call, Throwable t) {
+                System.out.println(t.toString());
+            }
+        });
+    }
+
+    private String get_request() {
+        return "abc";
     }
 
     private void advertise() {
@@ -173,8 +228,8 @@ public class MainActivity extends AppCompatActivity {
     private void update_devicelist(String device_info)
     {
         //runOnUiThread(() -> { // ble çalıştığı için aynı zamanda textview guncellensin diye thread gerekli
-            String currentText = device_listTextView.getText().toString();
-            device_listTextView.setText(currentText + "\n" + device_info);
+        String currentText = device_listTextView.getText().toString();
+        device_listTextView.setText(currentText + "\n" + device_info);
         //});
     }
 
