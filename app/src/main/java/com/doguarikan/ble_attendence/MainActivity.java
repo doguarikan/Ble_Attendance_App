@@ -138,7 +138,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String get_request() {
-        return "abc";
+        if (hash_instance != null) {
+            return hash_instance.getHash_code();
+        }
+        return "";
     }
 
     private void advertise() {
